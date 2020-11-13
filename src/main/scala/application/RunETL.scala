@@ -4,14 +4,14 @@ import application.extract.Extract
 import application.transform.Transform
 import application.load.Load
 
-object RunETL {
+object RunETL extends ((Extract, Transform, Load) => Either[Throwable, Unit]) {
   def apply(extract: Extract, transform: Transform, load: Load): Either[Throwable, Unit] = {
     for {
       sourceData <- extract.read()
       transformedData <- transform.transform(sourceData)
-      writeOutput <-  load.write(transformedData)
+      writeResult <-  load.write(transformedData)
     } yield {
-      writeOutput
+      writeResult
     }
   }
 }

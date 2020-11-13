@@ -20,5 +20,7 @@ object S3Util {
                   ): S3Path =
     S3Path(s"${s3Protocol.str}://${s3Bucket.str}/${s3Prefix.str}")
 
+  def getS3BucketFromPath(s3Path: S3Path): S3Bucket = S3Bucket(s3Path.str.split("/")(2))
+
   def createLocalServiceEndpoint(port: Int): String = s"http://localhost:$port"
 }

@@ -3,8 +3,15 @@ package application
 import application.S3Util.S3Port
 import io.findify.s3mock.S3Mock
 
+trait S3MockTargetComponent {
+  val s3MockAdapter: S3MockTarget
+}
+
 trait S3MockTarget {
   val s3Mock: S3Mock
+
+  def start(): Unit = s3Mock.start
+  def shutdown(): Unit = s3Mock.shutdown
 }
 
 object S3MockTarget {

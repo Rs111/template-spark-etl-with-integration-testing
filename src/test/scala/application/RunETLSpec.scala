@@ -1,12 +1,12 @@
 package application
 
-import application.S3Util.{ S3Bucket, S3Port }
+import application.S3Util.{ S3Port, getS3BucketFromPath }
 import application.DataFrameEqualityMatcher.equalTo
 import application.extract.LiveExtract
 import application.load.LiveLoad
 import application.model.S3Path
 import application.transform.LiveTransform
-import org.apache.spark.sql.{ DataFrame, SparkSession }
+import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.col
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -14,55 +14,55 @@ import org.scalatest.matchers.should.Matchers
 class RunETLSpec
   extends AnyFlatSpec
   with Matchers
-  with RunningLocalSparkS3Environment
+  with RunningLocalS3EnvironmentWithClient
+  with S3MockTargetComponent
+  with S3ClientTargetComponent
+  with SharedSparkContextTargetComponent
   with DataFixtures {
 
   private val s3Port = S3Port(9998)
-  override val s3MockTarget: S3MockTarget = S3MockTarget(s3Port)
-  override val s3ClientTarget: S3ClientTarget = S3ClientTarget(s3Port)
-  override val s3SharedSparkContext: S3SharedSparkContext = S3SharedSparkContext(s3Port)
-  private implicit val spark: SparkSession = s3SharedSparkContext.spark
+  override val s3MockAdapter: S3MockTarget = S3MockTarget(s3Port)
+  override val s3ClientAdapter: S3ClientTarget = S3ClientTarget(s3Port)
+  override val sharedSparkContextAdapter: SharedSparkContextTarget = S3SharedSparkContextTarget(s3Port)
+  private implicit val spark: SparkSession = sharedSparkContextAdapter.getSparkSession
 
   behavior of "RunETL"
 
   it should "successfully read, aggregate-by-date, and write data" in
-    withTestDataInS3(
-      S3Bucket("input-bucket"),
-      S3Path("s3a://input-bucket/input-prefix"),
-      S3Bucket("output-bucket"),
-      S3Path("s3a://output-bucket/output-prefix"),
-      createTestDataDF()
-    ) { testInputs =>
+    withS3Buckets(
+      inputPath=S3Path("s3a://input-bucket/input-prefix"),
+      outputPath=S3Path("s3a://output-bucket/output-prefix")
+    ) { testPaths =>
+
+      val testDataDF = createTestDataDF()
+      testDataDF.write.parquet(testPaths.inputPath.str)
 
       RunETL(
-        LiveExtract(testInputs.inputPath),
+        LiveExtract(testPaths.inputPath),
         LiveTransform(),
-        LiveLoad(testInputs.outputPath)
+        LiveLoad(testPaths.outputPath)
       )
 
-      val result = spark.read.parquet(testInputs.outputPath.str).orderBy(col("dt"))
+      val result = spark.read.parquet(testPaths.outputPath.str).orderBy(col("dt"))
       val expected = createExpectedDataDF()
 
       result should equalTo(expected)
   }
 
-  case class TestInputs(inputPath: S3Path, outputPath: S3Path, dataFixtures: DataFrame)
+  case class TestPaths(inputPath: S3Path, outputPath: S3Path)
 
-  private def withTestDataInS3(
-    inputBucket: S3Bucket,
-    inputPath: S3Path,
-    outputBucket: S3Bucket,
-    outputPath: S3Path,
-    testDataDF: DataFrame)(testCode: TestInputs => Any) = {
+  private def withS3Buckets(inputPath: S3Path, outputPath: S3Path)(testCode: TestPaths => Any) = {
+    val inputBucket = getS3BucketFromPath(inputPath)
+    val outputBucket = getS3BucketFromPath(outputPath)
+
     try {
-      s3ClientTarget.amazonS3.createBucket(inputBucket.str)
-      testDataDF.write.parquet(inputPath.str)
-      s3ClientTarget.amazonS3.createBucket(outputBucket.str)
-      testCode(TestInputs(inputPath, outputPath, testDataDF))
+      s3ClientAdapter.createBucket(inputBucket)
+      s3ClientAdapter.createBucket(outputBucket)
+      testCode(TestPaths(inputPath, outputPath))
     }
     finally {
-      s3ClientTarget.amazonS3.deleteBucket(inputBucket.str)
-      s3ClientTarget.amazonS3.deleteBucket(outputBucket.str)
+      s3ClientAdapter.deleteBucket(inputBucket)
+      s3ClientAdapter.deleteBucket(outputBucket)
     }
   }
 }

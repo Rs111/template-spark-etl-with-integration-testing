@@ -4,12 +4,18 @@ import application.S3Util.{ S3Port, createLocalServiceEndpoint }
 import org.apache.hadoop.fs.s3a.{DefaultS3ClientFactory, S3AFileSystem}
 import org.apache.spark.sql.SparkSession
 
-trait S3SharedSparkContext {
-  val spark: SparkSession
+trait SharedSparkContextTargetComponent {
+  val sharedSparkContextAdapter: SharedSparkContextTarget
 }
 
-object S3SharedSparkContext {
-  def apply(s3Port: S3Port): S3SharedSparkContext = new S3SharedSparkContext {
+trait SharedSparkContextTarget {
+  val spark: SparkSession
+
+  def getSparkSession: SparkSession = spark
+}
+
+object S3SharedSparkContextTarget {
+  def apply(s3Port: S3Port): SharedSparkContextTarget = new SharedSparkContextTarget {
     override val spark: SparkSession = {
       val _spark =
         SparkSession
