@@ -14,7 +14,7 @@ import org.scalatest.matchers.should.Matchers
 class RunETLSpec
   extends AnyFlatSpec
   with Matchers
-  with RunningLocalS3EnvironmentWithClient
+  with RunningLocalS3WithClient
   with S3MockTargetComponent
   with S3ClientTargetComponent
   with SharedSparkContextTargetComponent

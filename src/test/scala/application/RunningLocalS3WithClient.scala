@@ -2,7 +2,7 @@ package application
 
 import org.scalatest.{BeforeAndAfterAll, Suite}
 
-trait RunningLocalS3EnvironmentWithClient extends BeforeAndAfterAll {
+trait RunningLocalS3WithClient extends BeforeAndAfterAll {
   this: Suite
     with S3MockTargetComponent
     with S3ClientTargetComponent =>
